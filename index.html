@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Prancheta Tática Pro - Clean</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <!-- HTML2Canvas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    /* Gramado Estilo Clean / Minimalista */
+    .pitch-bg {
+      background-color: #3ba768;
+      background-image: repeating-linear-gradient(
+        0deg,
+        #3ba768,
+        #3ba768 30px,
+        #349b5f 30px,
+        #349b5f 60px
+      );
+    }
+
+    /* Tokens dos Jogadores */
+    .player-card {
+      touch-action: none;
+      -webkit-touch-callout: none;
+      cursor: grab;
+      z-index: 10;
+    }
+
+    .player-card:active {
+      cursor: grabbing;
+    }
+
+    /* Indicador Visual de Alvo durante o Arraste (Hover) */
+    .player-card.drop-target-hover .player-avatar-ring {
+      box-shadow: 0 0 0 4px #0284c7, 0 0 15px rgba(2, 132, 199, 0.5) !important;
+      transform: scale(1.15);
+    }
+
+    * {
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col">
+
+  <!-- Header / Barra Superior -->
+  <header class="bg-white border-b border-slate-200 px-3 py-2 md:px-4 md:py-3 flex flex-wrap justify-between items-center gap-2 shadow-sm">
+    <div class="flex items-center space-x-2">
+      <i data-lucide="shield" class="text-emerald-600 w-5 h-5 md:w-6 md:h-6"></i>
+      <h1 class="font-bold text-base md:text-xl tracking-tight text-slate-900">Prancheta Tática Pro</h1>
+    </div>
+
+    <!-- Ações Globais: Biblioteca, Backup, Download -->
+    <div class="flex items-center gap-1.5 md:gap-2 flex-wrap text-xs">
+      <button onclick="openPlayerLibraryModal()" class="flex items-center gap-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 active:scale-95 text-xs px-2.5 py-1.5 rounded-lg font-medium transition border border-indigo-200" title="Biblioteca Global de Jogadores">
+        <i data-lucide="users" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">Biblioteca Jogadores</span>
+      </button>
+      <button onclick="openBackupModal()" class="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-95 text-xs px-2.5 py-1.5 rounded-lg font-medium transition border border-slate-200" title="Backup em JSON">
+        <i data-lucide="database" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">Backup JSON</span>
+      </button>
+      <button onclick="resetPositions()" class="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-95 text-xs px-2.5 py-1.5 rounded-lg transition border border-slate-200" title="Redefinir Formações">
+        <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">Resetar</span>
+      </button>
+      <button onclick="exportTactics()" class="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95 text-xs px-2.5 py-1.5 rounded-lg font-medium transition shadow-sm" title="Exportar para Imagem">
+        <i data-lucide="download" class="w-3.5 h-3.5"></i> <span>Baixar Campo</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Conteúdo Principal -->
+  <main class="flex-1 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden relative gap-3 p-3">
+
+    <!-- Painel Lateral Esquerdo: Controles & Elenco Time A -->
+    <aside class="w-full lg:w-80 bg-white border border-slate-200 rounded-2xl p-3 flex flex-col gap-3 shrink-0 shadow-sm">
+      <div class="bg-red-50/50 p-2.5 rounded-xl border border-red-200 space-y-2">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2 w-3/4">
+            <input type="text" id="teamA-name" value="Time A (Vermelho)" onchange="updateTeamMeta('A')" class="bg-transparent font-bold text-red-600 border-b border-transparent hover:border-red-300 focus:border-red-600 outline-none text-xs md:text-sm w-full">
+          </div>
+          <span class="w-3 h-3 rounded-full bg-red-500 inline-block shadow-sm"></span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-1.5">
+          <button onclick="openClubModal('A')" class="bg-white hover:bg-slate-50 active:scale-95 text-red-700 text-xs py-1 px-2 rounded-lg border border-red-200 font-medium flex items-center justify-center gap-1 shadow-xs">
+            <i data-lucide="folder-open" class="w-3 h-3"></i> Carregar Clube
+          </button>
+          <button onclick="saveCurrentTeamAsClub('A')" class="bg-red-600 hover:bg-red-700 active:scale-95 text-white text-xs py-1 px-2 rounded-lg font-medium flex items-center justify-center gap-1 shadow-xs">
+            <i data-lucide="save" class="w-3 h-3"></i> Salvar Clube
+          </button>
+        </div>
+
+        <div>
+          <label class="text-[10px] text-slate-500 font-medium block mb-1">Formação Tática</label>
+          <select id="formation-A" onchange="applyFormation('A')" class="w-full bg-white border border-slate-200 rounded-lg text-xs py-1 px-2 text-slate-700 focus:outline-none focus:border-red-500">
+            <option value="4-4-2">4-4-2 Standard</option>
+            <option value="4-3-3">4-3-3 Ofensivo</option>
+            <option value="3-5-2">3-5-2 Equilibrado</option>
+            <option value="4-2-3-1">4-2-3-1 Moderno</option>
+            <option value="5-3-2">5-3-2 Defensivo</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="flex-1 flex flex-col min-h-[140px]">
+        <div class="flex border-b border-slate-200 mb-2">
+          <button onclick="switchTab('A', 'bench')" id="tabA-bench" class="flex-1 py-1 text-xs font-semibold border-b-2 border-red-500 text-red-600">Reservas</button>
+          <button onclick="switchTab('A', 'injured')" id="tabA-injured" class="flex-1 py-1 text-xs font-semibold text-slate-400 hover:text-slate-600">Lesionados</button>
+        </div>
+
+        <div id="benchA-container" class="bench-zone flex-1 bg-slate-50 p-2 rounded-xl border border-dashed border-slate-200 min-h-[100px] flex flex-wrap gap-2 content-start overflow-y-auto"></div>
+        <div id="injuredA-container" class="injured-zone hidden flex-1 bg-red-50/30 p-2 rounded-xl border border-dashed border-red-200 min-h-[100px] flex flex-wrap gap-2 content-start overflow-y-auto"></div>
+      </div>
+    </aside>
+
+    <!-- Área Central: Campo Tático de Futebol -->
+    <section class="flex-1 bg-white p-2 md:p-3 rounded-2xl border border-slate-200 flex items-center justify-center overflow-auto min-h-[360px] md:min-h-[500px] shadow-sm">
+      <div id="tactical-pitch" class="pitch-bg relative w-full max-w-[850px] aspect-[1.5/1] rounded-xl overflow-hidden shadow-md border border-slate-300 flex flex-col justify-between p-2">
+        <svg class="absolute inset-0 w-full h-full pointer-events-none stroke-white/80 fill-none" stroke-width="2">
+          <rect x="2%" y="3%" width="96%" height="94%" rx="4" />
+          <line x1="50%" y1="3%" x2="50%" y2="97%" />
+          <circle cx="50%" cy="50%" r="12%" />
+          <circle cx="50%" cy="50%" r="0.5%" class="fill-white" />
+          <rect x="2%" y="22%" width="16%" height="56%" />
+          <rect x="2%" y="36%" width="6%" height="28%" />
+          <path d="M 18% 42% A 12% 12% 0 0 1 18% 58%" />
+          <rect x="82%" y="22%" width="16%" height="56%" />
+          <rect x="92%" y="36%" width="6%" height="28%" />
+          <path d="M 82% 42% A 12% 12% 0 0 0 82% 58%" />
+        </svg>
+
+        <div id="pitch-drop-zone" class="absolute inset-0 w-full h-full"></div>
+      </div>
+    </section>
+
+    <!-- Painel Lateral Direito: Controles & Elenco Time B -->
+    <aside class="w-full lg:w-80 bg-white border border-slate-200 rounded-2xl p-3 flex flex-col gap-3 shrink-0 shadow-sm">
+      <div class="bg-blue-50/50 p-2.5 rounded-xl border border-blue-200 space-y-2">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2 w-3/4">
+            <input type="text" id="teamB-name" value="Time B (Azul)" onchange="updateTeamMeta('B')" class="bg-transparent font-bold text-blue-600 border-b border-transparent hover:border-blue-300 focus:border-blue-600 outline-none text-xs md:text-sm w-full">
+          </div>
+          <span class="w-3 h-3 rounded-full bg-blue-500 inline-block shadow-sm"></span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-1.5">
+          <button onclick="openClubModal('B')" class="bg-white hover:bg-slate-50 active:scale-95 text-blue-700 text-xs py-1 px-2 rounded-lg border border-blue-200 font-medium flex items-center justify-center gap-1 shadow-xs">
+            <i data-lucide="folder-open" class="w-3 h-3"></i> Carregar Clube
+          </button>
+          <button onclick="saveCurrentTeamAsClub('B')" class="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs py-1 px-2 rounded-lg font-medium flex items-center justify-center gap-1 shadow-xs">
+            <i data-lucide="save" class="w-3 h-3"></i> Salvar Clube
+          </button>
+        </div>
+
+        <div>
+          <label class="text-[10px] text-slate-500 font-medium block mb-1">Formação Tática</label>
+          <select id="formation-B" onchange="applyFormation('B')" class="w-full bg-white border border-slate-200 rounded-lg text-xs py-1 px-2 text-slate-700 focus:outline-none focus:border-blue-500">
+            <option value="4-4-2">4-4-2 Standard</option>
+            <option value="4-3-3" selected>4-3-3 Ofensivo</option>
+            <option value="3-5-2">3-5-2 Equilibrado</option>
+            <option value="4-2-3-1">4-2-3-1 Moderno</option>
+            <option value="5-3-2">5-3-2 Defensivo</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="flex-1 flex flex-col min-h-[140px]">
+        <div class="flex border-b border-slate-200 mb-2">
+          <button onclick="switchTab('B', 'bench')" id="tabB-bench" class="flex-1 py-1 text-xs font-semibold border-b-2 border-blue-500 text-blue-600">Reservas</button>
+          <button onclick="switchTab('B', 'injured')" id="tabB-injured" class="flex-1 py-1 text-xs font-semibold text-slate-400 hover:text-slate-600">Lesionados</button>
+        </div>
+
+        <div id="benchB-container" class="bench-zone flex-1 bg-slate-50 p-2 rounded-xl border border-dashed border-slate-200 min-h-[100px] flex flex-wrap gap-2 content-start overflow-y-auto"></div>
+        <div id="injuredB-container" class="injured-zone hidden flex-1 bg-red-50/30 p-2 rounded-xl border border-dashed border-red-200 min-h-[100px] flex flex-wrap gap-2 content-start overflow-y-auto"></div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- MODAL DE CONFIRMAÇÃO DE SOBRESCRITA DE CLUBE -->
+  <div id="overwrite-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white border border-amber-200 rounded-2xl w-full max-w-sm overflow-hidden shadow-xl p-4 space-y-4">
+      <div class="flex items-center gap-2 text-amber-600 font-bold text-sm">
+        <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+        <span>Clube Já Existente</span>
+      </div>
+      <p id="overwrite-modal-text" class="text-xs text-slate-600 leading-relaxed">
+        Já existe um clube salvo com este nome. Deseja substituir a escalação antiga ou salvar com um novo nome?
+      </p>
+      <div class="flex flex-col gap-2 pt-2 border-t border-slate-100">
+        <button id="btn-overwrite-confirm" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs py-2 rounded-xl transition shadow-xs">
+          Sim, Substituir Clube
+        </button>
+        <button id="btn-overwrite-new" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs py-2 rounded-xl transition">
+          Não, Salvar com Novo Nome
+        </button>
+        <button onclick="closeModal('overwrite-modal')" class="w-full text-slate-400 hover:text-slate-600 text-xs py-1">
+          Cancelar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE EDIÇÃO DE JOGADOR (COM BUSCA NA BASE DE DADOS INTEGRADA) -->
+  <div id="edit-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white border border-slate-200 rounded-2xl w-full max-w-md overflow-hidden shadow-xl">
+      <div class="bg-slate-50 px-4 py-3 flex justify-between items-center border-b border-slate-200">
+        <h3 class="font-bold text-slate-800 flex items-center gap-2 text-sm">
+          <i data-lucide="user-cog" class="w-4 h-4 text-emerald-600"></i> Editar Atleta
+        </h3>
+        <button onclick="closeModal('edit-modal')" class="text-slate-400 hover:text-slate-600 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+
+      <div class="p-4 space-y-3">
+        <!-- BUSCAR E CARREGAR DA BASE DE DADOS -->
+        <div class="relative bg-indigo-50/60 p-2.5 rounded-xl border border-indigo-100 space-y-1.5">
+          <label class="block text-[11px] font-bold text-indigo-900 flex items-center gap-1">
+            <i data-lucide="search" class="w-3.5 h-3.5 text-indigo-600"></i> Importar da Base de Dados
+          </label>
+          <input type="text" id="edit-search-db" oninput="searchInDatabase(this.value)" placeholder="Digite o nome do atleta para puxar dados..." class="w-full bg-white border border-indigo-200 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-indigo-500 shadow-2xs">
+          
+          <!-- Lista Flutuante de Resultados da Busca -->
+          <div id="db-search-results" class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-40 overflow-y-auto z-50 p-1 space-y-1"></div>
+        </div>
+
+        <form id="edit-player-form" onsubmit="savePlayer(event)" class="space-y-3 pt-1">
+          <input type="hidden" id="edit-player-id">
+
+          <div class="flex items-center gap-4">
+            <div class="relative w-14 h-14 rounded-full overflow-hidden border-2 border-emerald-500 bg-slate-100 flex-shrink-0 shadow-sm">
+              <img id="edit-preview-img" src="" alt="Preview" class="w-full h-full object-cover">
+            </div>
+            <div class="text-xs text-slate-500">
+              <p class="font-medium text-slate-700">Foto do Jogador</p>
+              <p class="text-[10px]">Escolha um arquivo local ou cole um link direto.</p>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Nome do Jogador</label>
+            <input type="text" id="edit-player-name" required class="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-800 focus:outline-none focus:border-emerald-500">
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Posição</label>
+              <select id="edit-player-pos" class="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-800 focus:outline-none focus:border-emerald-500">
+                <option value="GOL">Goleiro (GOL)</option>
+                <option value="ZAG">Zagueiro (ZAG)</option>
+                <option value="LE">Lateral Esq. (LE)</option>
+                <option value="LD">Lateral Dir. (LD)</option>
+                <option value="VOL">Volante (VOL)</option>
+                <option value="MC">Meio Campo (MC)</option>
+                <option value="MEI">Meia Atacante (MEI)</option>
+                <option value="ATA">Atacante (ATA)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Nº da Camisa</label>
+              <input type="number" id="edit-player-number" min="1" max="99" required class="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-800 focus:outline-none focus:border-emerald-500">
+            </div>
+          </div>
+
+          <div class="space-y-1">
+            <label class="block text-xs font-semibold text-slate-600">Alterar Foto</label>
+            <input type="url" id="edit-player-url" placeholder="URL da foto (ex: https://...)" class="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-emerald-500" onchange="previewUrlImage(this.value)">
+            <div class="text-center text-[10px] text-slate-400 font-bold">OU</div>
+            <input type="file" id="edit-player-file" accept="image/*" class="block w-full text-xs text-slate-500 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 cursor-pointer" onchange="previewFileImage(this)">
+          </div>
+
+          <div class="pt-2 border-t border-slate-200 flex justify-between items-center">
+            <button type="button" onclick="saveToGlobalLibraryFromModal()" class="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg border border-indigo-200 font-medium flex items-center gap-1 transition">
+              <i data-lucide="bookmark" class="w-3.5 h-3.5"></i> Salvar na Base
+            </button>
+            <div class="flex gap-2">
+              <button type="button" onclick="closeModal('edit-modal')" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs text-slate-600 font-medium">Cancelar</button>
+              <button type="submit" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-xs text-white font-medium shadow-xs">Salvar</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL BIBLIOTECA DE JOGADORES -->
+  <div id="library-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white border border-slate-200 rounded-2xl w-full max-w-2xl overflow-hidden shadow-xl flex flex-col max-h-[85vh]">
+      <div class="bg-slate-50 px-4 py-3 flex justify-between items-center border-b border-slate-200">
+        <h3 class="font-bold text-slate-800 flex items-center gap-2 text-sm">
+          <i data-lucide="users" class="w-4 h-4 text-indigo-600"></i> Biblioteca Global de Jogadores Salvos
+        </h3>
+        <button onclick="closeModal('library-modal')" class="text-slate-400 hover:text-slate-600 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+
+      <div class="p-3 bg-slate-50 border-b border-slate-200 flex gap-2">
+        <input type="text" id="library-search" oninput="renderLibraryItems()" placeholder="Buscar por nome, posição..." class="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-indigo-500">
+      </div>
+
+      <div id="library-list-container" class="p-4 overflow-y-auto flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3 content-start"></div>
+    </div>
+  </div>
+
+  <!-- MODAL GERENCIADOR DE CLUBES -->
+  <div id="club-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white border border-slate-200 rounded-2xl w-full max-w-lg overflow-hidden shadow-xl flex flex-col max-h-[80vh]">
+      <div class="bg-slate-50 px-4 py-3 flex justify-between items-center border-b border-slate-200">
+        <h3 class="font-bold text-slate-800 flex items-center gap-2 text-sm">
+          <i data-lucide="shield" class="w-4 h-4 text-amber-600"></i> Clubes Salvos
+        </h3>
+        <button onclick="closeModal('club-modal')" class="text-slate-400 hover:text-slate-600 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+
+      <div class="p-3 bg-slate-50 border-b border-slate-200">
+        <div class="relative">
+          <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+          <input type="text" id="club-search" oninput="renderClubList()" placeholder="Pesquisar clube pelo nome..." class="w-full bg-white border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-amber-500">
+        </div>
+      </div>
+
+      <div id="club-list-container" class="p-4 overflow-y-auto flex-1 space-y-2"></div>
+    </div>
+  </div>
+
+  <!-- MODAL BACKUP / RESTORE JSON -->
+  <div id="backup-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white border border-slate-200 rounded-2xl w-full max-w-md overflow-hidden shadow-xl p-4 space-y-4">
+      <div class="flex justify-between items-center border-b border-slate-200 pb-2">
+        <h3 class="font-bold text-slate-800 flex items-center gap-2 text-sm">
+          <i data-lucide="database" class="w-4 h-4 text-emerald-600"></i> Backup e Restauração (JSON)
+        </h3>
+        <button onclick="closeModal('backup-modal')" class="text-slate-400 hover:text-slate-600 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Exportar Dados Salvos</label>
+          <button onclick="exportJSONBackup()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs py-2 rounded-xl font-medium flex items-center justify-center gap-1.5 shadow-xs">
+            <i data-lucide="download" class="w-4 h-4"></i> Baixar Arquivo JSON de Backup
+          </button>
+        </div>
+
+        <div class="border-t border-slate-200 pt-3">
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Importar Arquivo de Backup</label>
+          <input type="file" id="backup-file-input" accept=".json" class="block w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 cursor-pointer" onchange="importJSONBackup(this)">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- SCRIPT -->
+  <script>
+    const DEFAULT_AVATAR = "https://placehold.co/100x100/e2e8f0/475569?text=PLAYER";
+
+    const FORMATIONS = {
+      '4-4-2': [
+        { x: 6, y: 50, pos: 'GOL' },
+        { x: 20, y: 18, pos: 'LE' }, { x: 18, y: 38, pos: 'ZAG' }, { x: 18, y: 62, pos: 'ZAG' }, { x: 20, y: 82, pos: 'LD' },
+        { x: 33, y: 22, pos: 'MC' }, { x: 30, y: 40, pos: 'VOL' }, { x: 30, y: 60, pos: 'VOL' }, { x: 33, y: 78, pos: 'MC' },
+        { x: 44, y: 38, pos: 'ATA' }, { x: 44, y: 62, pos: 'ATA' }
+      ],
+      '4-3-3': [
+        { x: 6, y: 50, pos: 'GOL' },
+        { x: 20, y: 18, pos: 'LE' }, { x: 18, y: 38, pos: 'ZAG' }, { x: 18, y: 62, pos: 'ZAG' }, { x: 20, y: 82, pos: 'LD' },
+        { x: 30, y: 50, pos: 'VOL' }, { x: 34, y: 32, pos: 'MC' }, { x: 34, y: 68, pos: 'MC' },
+        { x: 44, y: 20, pos: 'ATA' }, { x: 45, y: 50, pos: 'ATA' }, { x: 44, y: 80, pos: 'ATA' }
+      ],
+      '3-5-2': [
+        { x: 6, y: 50, pos: 'GOL' },
+        { x: 18, y: 28, pos: 'ZAG' }, { x: 17, y: 50, pos: 'ZAG' }, { x: 18, y: 72, pos: 'ZAG' },
+        { x: 32, y: 15, pos: 'MEI' }, { x: 28, y: 38, pos: 'VOL' }, { x: 32, y: 50, pos: 'MC' }, { x: 28, y: 62, pos: 'VOL' }, { x: 32, y: 85, pos: 'MEI' },
+        { x: 44, y: 38, pos: 'ATA' }, { x: 44, y: 62, pos: 'ATA' }
+      ],
+      '4-2-3-1': [
+        { x: 6, y: 50, pos: 'GOL' },
+        { x: 20, y: 18, pos: 'LE' }, { x: 18, y: 38, pos: 'ZAG' }, { x: 18, y: 62, pos: 'ZAG' }, { x: 20, y: 82, pos: 'LD' },
+        { x: 28, y: 38, pos: 'VOL' }, { x: 28, y: 62, pos: 'VOL' },
+        { x: 38, y: 22, pos: 'MEI' }, { x: 37, y: 50, pos: 'MEI' }, { x: 38, y: 78, pos: 'MEI' },
+        { x: 45, y: 50, pos: 'ATA' }
+      ],
+      '5-3-2': [
+        { x: 6, y: 50, pos: 'GOL' },
+        { x: 20, y: 15, pos: 'LE' }, { x: 18, y: 32, pos: 'ZAG' }, { x: 17, y: 50, pos: 'ZAG' }, { x: 18, y: 68, pos: 'ZAG' }, { x: 20, y: 85, pos: 'LD' },
+        { x: 32, y: 30, pos: 'MC' }, { x: 30, y: 50, pos: 'VOL' }, { x: 32, y: 70, pos: 'MC' },
+        { x: 44, y: 38, pos: 'ATA' }, { x: 44, y: 62, pos: 'ATA' }
+      ]
+    };
+
+    function getTeamBPositions(formationKey) {
+      const base = FORMATIONS[formationKey] || FORMATIONS['4-4-2'];
+      return base.map(coord => ({
+        x: 100 - coord.x,
+        y: coord.y,
+        pos: coord.pos
+      }));
+    }
+
+    let players = [];
+    let savedClubs = [];
+    let globalPlayerLibrary = [];
+    let targetClubModalTeam = 'A';
+
+    function initApp() {
+      loadLocalStorageData();
+      if (!players || players.length === 0) {
+        initDefaultMatch();
+      }
+      renderAll();
+    }
+
+    function initDefaultMatch() {
+      players = [];
+      const formA = FORMATIONS['4-4-2'];
+      const namesA = ["Alisson", "A. Arnold", "Marquinhos", "E. Militão", "W. Wendell", "Casemiro", "B. Guimarães", "L. Paquetá", "Raphinha", "Vini Jr", "Rodrygo"];
+      formA.forEach((c, i) => {
+        players.push({
+          id: `A_starter_${i}`, team: 'A', name: namesA[i] || `Jogador ${i+1}`, number: i + 1,
+          pos: c.pos, status: 'pitch', x: c.x, y: c.y, photo: DEFAULT_AVATAR
+        });
+      });
+      for (let i = 11; i < 16; i++) {
+        players.push({
+          id: `A_res_${i}`, team: 'A', name: `Res. A${i-10}`, number: i + 1,
+          pos: 'RES', status: 'bench', x: 0, y: 0, photo: DEFAULT_AVATAR
+        });
+      }
+
+      const formB = getTeamBPositions('4-3-3');
+      const namesB = ["Courtois", "Carvajal", "Rüdiger", "Alaba", "Mendy", "Kroos", "Modric", "Bellingham", "Valverde", "Mbappé", "Vinicius"];
+      formB.forEach((c, i) => {
+        players.push({
+          id: `B_starter_${i}`, team: 'B', name: namesB[i] || `Jogador ${i+1}`, number: i + 1,
+          pos: c.pos, status: 'pitch', x: c.x, y: c.y, photo: DEFAULT_AVATAR
+        });
+      });
+      for (let i = 11; i < 16; i++) {
+        players.push({
+          id: `B_res_${i}`, team: 'B', name: `Res. B${i-10}`, number: i + 1,
+          pos: 'RES', status: 'bench', x: 0, y: 0, photo: DEFAULT_AVATAR
+        });
+      }
+
+      saveStateToLocalStorage();
+    }
+
+    function saveStateToLocalStorage() {
+      const matchState = {
+        players: players,
+        teamAName: document.getElementById('teamA-name')?.value || 'Time A',
+        teamBName: document.getElementById('teamB-name')?.value || 'Time B',
+        formationA: document.getElementById('formation-A')?.value || '4-4-2',
+        formationB: document.getElementById('formation-B')?.value || '4-3-3'
+      };
+      localStorage.setItem('tactical_board_match_state', JSON.stringify(matchState));
+      localStorage.setItem('tactical_board_clubs', JSON.stringify(savedClubs));
+      localStorage.setItem('tactical_board_library', JSON.stringify(globalPlayerLibrary));
+    }
+
+    function loadLocalStorageData() {
+      try {
+        const savedMatch = localStorage.getItem('tactical_board_match_state');
+        if (savedMatch) {
+          const data = JSON.parse(savedMatch);
+          players = data.players || [];
+          if (document.getElementById('teamA-name')) document.getElementById('teamA-name').value = data.teamAName || 'Time A';
+          if (document.getElementById('teamB-name')) document.getElementById('teamB-name').value = data.teamBName || 'Time B';
+          if (document.getElementById('formation-A')) document.getElementById('formation-A').value = data.formationA || '4-4-2';
+          if (document.getElementById('formation-B')) document.getElementById('formation-B').value = data.formationB || '4-3-3';
+        }
+        const clubsData = localStorage.getItem('tactical_board_clubs');
+        if (clubsData) savedClubs = JSON.parse(clubsData);
+
+        const libData = localStorage.getItem('tactical_board_library');
+        if (libData) globalPlayerLibrary = JSON.parse(libData);
+      } catch (err) {
+        console.error("Erro ao carregar dados salvos:", err);
+      }
+    }
+
+    function renderAll() {
+      renderPitch();
+      renderBenchAndInjured();
+      if (window.lucide) {
+        lucide.createIcons();
+      }
+    }
+
+    function renderPitch() {
+      const dropZone = document.getElementById('pitch-drop-zone');
+      dropZone.innerHTML = '';
+      const pitchPlayers = players.filter(p => p.status === 'pitch');
+
+      pitchPlayers.forEach(player => {
+        const card = createPlayerTokenElement(player);
+        card.style.position = 'absolute';
+        card.style.left = `${player.x}%`;
+        card.style.top = `${player.y}%`;
+        card.style.transform = 'translate(-50%, -50%)';
+        dropZone.appendChild(card);
+      });
+    }
+
+    function renderBenchAndInjured() {
+      const benchA = document.getElementById('benchA-container');
+      const injuredA = document.getElementById('injuredA-container');
+      const benchB = document.getElementById('benchB-container');
+      const injuredB = document.getElementById('injuredB-container');
+
+      benchA.innerHTML = ''; injuredA.innerHTML = '';
+      benchB.innerHTML = ''; injuredB.innerHTML = '';
+
+      players.forEach(player => {
+        if (player.status === 'pitch') return;
+        const card = createPlayerTokenElement(player);
+        if (player.team === 'A') {
+          if (player.status === 'bench') benchA.appendChild(card);
+          else if (player.status === 'injured') injuredA.appendChild(card);
+        } else {
+          if (player.status === 'bench') benchB.appendChild(card);
+          else if (player.status === 'injured') injuredB.appendChild(card);
+        }
+      });
+    }
+
+    function createPlayerTokenElement(player) {
+      const card = document.createElement('div');
+      card.className = `player-card flex flex-col items-center group select-none`;
+      card.dataset.id = player.id;
+
+      const isTeamA = player.team === 'A';
+      const ringColor = isTeamA ? 'border-red-500 bg-white' : 'border-blue-500 bg-white';
+      const badgeBg = isTeamA ? 'bg-red-500' : 'bg-blue-500';
+
+      card.innerHTML = `
+        <div class="relative">
+          <div class="player-avatar-ring w-9 h-9 md:w-11 md:h-11 rounded-full border-2 ${ringColor} overflow-hidden shadow-md transition-all flex items-center justify-center">
+            <img src="${player.photo}" class="w-full h-full object-cover pointer-events-none" onerror="this.src='${DEFAULT_AVATAR}'">
+          </div>
+          <span class="absolute -top-1 -right-1 ${badgeBg} text-white text-[9px] font-extrabold w-4 h-4 rounded-full flex items-center justify-center border border-white shadow-xs">
+            ${player.number}
+          </span>
+        </div>
+        <div class="mt-0.5 bg-white/95 backdrop-blur-xs px-1.5 py-0.5 rounded-md border border-slate-200 text-center max-w-[68px] md:max-w-[80px] truncate shadow-xs">
+          <p class="text-[9px] md:text-[10px] font-bold text-slate-800 truncate leading-tight">${player.name}</p>
+          <p class="text-[8px] font-semibold text-emerald-600 leading-tight uppercase">${player.pos}</p>
+        </div>
+      `;
+
+      setupDragAndDropEvents(card, player);
+      return card;
+    }
+
+    function setupDragAndDropEvents(card, player) {
+      let isDragging = false;
+      let dragDistance = 0;
+      let startX = 0, startY = 0;
+      let tapTimer = null;
+      let tapCount = 0;
+      let currentHoveredTarget = null;
+
+      const pitch = document.getElementById('tactical-pitch');
+
+      const clearHoverHighlights = () => {
+        document.querySelectorAll('.player-card.drop-target-hover').forEach(el => {
+          el.classList.remove('drop-target-hover');
+        });
+        currentHoveredTarget = null;
+      };
+
+      const getPlayerTargetUnderPoint = (clientX, clientY) => {
+        card.style.visibility = 'hidden';
+        const elemBelow = document.elementFromPoint(clientX, clientY);
+        card.style.visibility = 'visible';
+        if (!elemBelow) return null;
+        const targetCard = elemBelow.closest('.player-card');
+        if (targetCard && targetCard.dataset.id !== player.id) return targetCard;
+        return null;
+      };
+
+      const onStart = (e) => {
+        isDragging = false;
+        dragDistance = 0;
+        const touch = e.touches ? e.touches[0] : e;
+        startX = touch.clientX;
+        startY = touch.clientY;
+
+        if (e.type === 'touchstart') {
+          document.addEventListener('touchmove', onMove, { passive: false });
+          document.addEventListener('touchend', onEnd);
+          document.addEventListener('touchcancel', onEnd);
+        } else {
+          document.addEventListener('mousemove', onMove);
+          document.addEventListener('mouseup', onEnd);
+        }
+      };
+
+      const onMove = (e) => {
+        const touch = e.touches ? e.touches[0] : e;
+        const deltaX = touch.clientX - startX;
+        const deltaY = touch.clientY - startY;
+        dragDistance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+        if (dragDistance > 6) {
+          isDragging = true;
+          if (e.cancelable) e.preventDefault();
+          card.style.position = 'fixed';
+          card.style.zIndex = '1000';
+          card.style.left = `${touch.clientX}px`;
+          card.style.top = `${touch.clientY}px`;
+          card.style.transform = 'translate(-50%, -50%)';
+
+          const targetCard = getPlayerTargetUnderPoint(touch.clientX, touch.clientY);
+          if (targetCard !== currentHoveredTarget) {
+            clearHoverHighlights();
+            if (targetCard) {
+              targetCard.classList.add('drop-target-hover');
+              currentHoveredTarget = targetCard;
+            }
+          }
+        }
+      };
+
+      const onEnd = (e) => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('touchmove', onMove);
+        document.removeEventListener('mouseup', onEnd);
+        document.removeEventListener('touchend', onEnd);
+        document.removeEventListener('touchcancel', onEnd);
+
+        if (isDragging) {
+          const touch = e.changedTouches ? e.changedTouches[0] : e;
+          const clientX = touch.clientX;
+          const clientY = touch.clientY;
+          const targetCard = getPlayerTargetUnderPoint(clientX, clientY);
+          clearHoverHighlights();
+
+          if (targetCard) {
+            swapPlayers(player.id, targetCard.dataset.id);
+          } else {
+            const pitchRect = pitch.getBoundingClientRect();
+            if (clientX >= pitchRect.left && clientX <= pitchRect.right && clientY >= pitchRect.top && clientY <= pitchRect.bottom) {
+              const posX = ((clientX - pitchRect.left) / pitchRect.width) * 100;
+              const posY = ((clientY - pitchRect.top) / pitchRect.height) * 100;
+              player.status = 'pitch';
+              player.x = Math.max(3, Math.min(97, posX));
+              player.y = Math.max(3, Math.min(97, posY));
+            } else {
+              const targetZone = document.elementFromPoint(clientX, clientY);
+              const benchZone = targetZone?.closest('.bench-zone');
+              const injuredZone = targetZone?.closest('.injured-zone');
+              if (benchZone) player.status = 'bench';
+              else if (injuredZone) player.status = 'injured';
+            }
+          }
+          saveStateToLocalStorage();
+          renderAll();
+        } else {
+          handleCardTap(player);
+        }
+      };
+
+      card.addEventListener('mousedown', onStart);
+      card.addEventListener('touchstart', onStart, { passive: false });
+
+      function handleCardTap(p) {
+        tapCount++;
+        if (tapCount === 1) {
+          tapTimer = setTimeout(() => { tapCount = 0; }, 280);
+        } else if (tapCount === 2) {
+          clearTimeout(tapTimer);
+          tapCount = 0;
+          openEditModal(p.id);
+        }
+      }
+    }
+
+    function swapPlayers(id1, id2) {
+      const p1 = players.find(p => p.id === id1);
+      const p2 = players.find(p => p.id === id2);
+      if (!p1 || !p2) return;
+      const tempStatus = p1.status; p1.status = p2.status; p2.status = tempStatus;
+      const tempX = p1.x; const tempY = p1.y; p1.x = p2.x; p1.y = p2.y; p2.x = tempX; p2.y = tempY;
+      saveStateToLocalStorage();
+    }
+
+    function applyFormation(team) {
+      const select = document.getElementById(`formation-${team}`);
+      const formationKey = select.value;
+      const coords = team === 'A' ? FORMATIONS[formationKey] : getTeamBPositions(formationKey);
+      const teamPitchPlayers = players.filter(p => p.team === team && p.status === 'pitch');
+      teamPitchPlayers.forEach((player, index) => {
+        if (coords[index]) {
+          player.x = coords[index].x;
+          player.y = coords[index].y;
+          player.pos = coords[index].pos;
+        }
+      });
+      saveStateToLocalStorage();
+      renderAll();
+    }
+
+    function updateTeamMeta(team) { saveStateToLocalStorage(); }
+
+    function buildClubDataObject(team, clubName) {
+      const formation = document.getElementById(team === 'A' ? 'formation-A' : 'formation-B').value;
+      const teamPlayers = players.filter(p => p.team === team).map(p => ({
+        name: p.name, number: p.number, pos: p.pos, status: p.status, x: p.x, y: p.y, photo: p.photo
+      }));
+      return { id: 'club_' + Date.now(), name: clubName, formation: formation, players: teamPlayers, savedAt: new Date().toLocaleDateString() };
+    }
+
+    function saveCurrentTeamAsClub(team) {
+      const teamNameInput = document.getElementById(team === 'A' ? 'teamA-name' : 'teamB-name');
+      const clubName = teamNameInput.value.trim();
+      if (!clubName) { showToast("Por favor, digite um nome válido para o clube.", "error"); return; }
+      const existingIndex = savedClubs.findIndex(c => c.name.toLowerCase() === clubName.toLowerCase());
+
+      if (existingIndex >= 0) {
+        document.getElementById('overwrite-modal-text').innerText = `O clube "${savedClubs[existingIndex].name}" já está salvo. Deseja substituir os dados existentes ou criar um novo registro?`;
+        document.getElementById('btn-overwrite-confirm').onclick = function() {
+          const clubData = buildClubDataObject(team, savedClubs[existingIndex].name);
+          clubData.id = savedClubs[existingIndex].id;
+          savedClubs[existingIndex] = clubData;
+          saveStateToLocalStorage(); closeModal('overwrite-modal');
+          showToast(`Clube "${clubData.name}" substituído com sucesso!`, "success");
+        };
+        document.getElementById('btn-overwrite-new').onclick = function() {
+          let count = 1, newName = `${clubName} (${count})`;
+          while (savedClubs.some(c => c.name.toLowerCase() === newName.toLowerCase())) { count++; newName = `${clubName} (${count})`; }
+          const clubData = buildClubDataObject(team, newName);
+          savedClubs.push(clubData);
+          if (team === 'A') document.getElementById('teamA-name').value = newName;
+          else document.getElementById('teamB-name').value = newName;
+          saveStateToLocalStorage(); closeModal('overwrite-modal');
+          showToast(`Clube salvo como "${newName}"!`, "success");
+        };
+        document.getElementById('overwrite-modal').classList.remove('hidden');
+      } else {
+        savedClubs.push(buildClubDataObject(team, clubName));
+        saveStateToLocalStorage();
+        showToast(`Clube "${clubName}" salvo com sucesso!`, "success");
+      }
+    }
+
+    function openClubModal(targetTeam) {
+      targetClubModalTeam = targetTeam;
+      if (document.getElementById('club-search')) document.getElementById('club-search').value = '';
+      renderClubList();
+      document.getElementById('club-modal').classList.remove('hidden');
+    }
+
+    function renderClubList() {
+      const container = document.getElementById('club-list-container');
+      const query = document.getElementById('club-search')?.value.toLowerCase().trim() || '';
+      container.innerHTML = '';
+      if (savedClubs.length === 0) {
+        container.innerHTML = `<p class="text-xs text-slate-400 text-center py-6">Nenhum clube salvo ainda.</p>`;
+        return;
+      }
+      const filtered = savedClubs.filter(c => c.name.toLowerCase().includes(query));
+      filtered.forEach(club => {
+        const item = document.createElement('div');
+        item.className = 'bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-2';
+        item.innerHTML = `
+          <div><h4 class="font-bold text-sm text-slate-800">${club.name}</h4><p class="text-[10px] text-slate-500">Formação: ${club.formation} | Atletas: ${club.players.length}</p></div>
+          <div class="flex gap-2">
+            <button onclick="loadClubToTeam('${club.id}')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-2.5 py-1 rounded-lg font-medium shadow-2xs">Carregar</button>
+            <button onclick="deleteClub(event, '${club.id}')" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-xs px-2 py-1 rounded-lg"><i data-lucide="trash-2" class="w-3.5 h-3.5 pointer-events-none"></i></button>
+          </div>`;
+        container.appendChild(item);
+      });
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function loadClubToTeam(clubId) {
+      const club = savedClubs.find(c => c.id === clubId);
+      if (!club) return;
+      const team = targetClubModalTeam;
+      players = players.filter(p => p.team !== team);
+      club.players.forEach((p, idx) => {
+        players.push({ id: `${team}_${Date.now()}_${idx}`, team: team, name: p.name, number: p.number, pos: p.pos, status: p.status, x: p.x, y: p.y, photo: p.photo });
+      });
+      if (team === 'A') { document.getElementById('teamA-name').value = club.name; document.getElementById('formation-A').value = club.formation; }
+      else { document.getElementById('teamB-name').value = club.name; document.getElementById('formation-B').value = club.formation; }
+      saveStateToLocalStorage(); renderAll(); closeModal('club-modal');
+      showToast(`Clube "${club.name}" carregado!`, "info");
+    }
+
+    function deleteClub(event, clubId) {
+      if (event) event.stopPropagation();
+      const idx = savedClubs.findIndex(c => c.id === clubId);
+      if (idx !== -1 && confirm(`Remover clube?`)) {
+        savedClubs.splice(idx, 1);
+        saveStateToLocalStorage(); renderClubList();
+      }
+    }
+
+    function openPlayerLibraryModal() { renderLibraryItems(); document.getElementById('library-modal').classList.remove('hidden'); }
+    
+    function saveToGlobalLibraryFromModal() {
+      const name = document.getElementById('edit-player-name').value;
+      const pos = document.getElementById('edit-player-pos').value;
+      const number = parseInt(document.getElementById('edit-player-number').value) || 10;
+      const photo = document.getElementById('edit-preview-img').src;
+      
+      if (!name.trim()) { showToast("Digite um nome para o atleta.", "error"); return; }
+
+      const existing = globalPlayerLibrary.findIndex(p => p.name.toLowerCase() === name.toLowerCase());
+      const pData = { id: existing >= 0 ? globalPlayerLibrary[existing].id : 'lib_' + Date.now(), name, pos, number, photo };
+      if (existing >= 0) globalPlayerLibrary[existing] = pData; else globalPlayerLibrary.push(pData);
+      saveStateToLocalStorage(); showToast("Atleta salvo na Base de Dados!", "success");
+    }
+
+    function renderLibraryItems() {
+      const container = document.getElementById('library-list-container');
+      const query = document.getElementById('library-search').value.toLowerCase();
+      container.innerHTML = '';
+      const filtered = globalPlayerLibrary.filter(p => p.name.toLowerCase().includes(query));
+      if (filtered.length === 0) { container.innerHTML = `<p class="col-span-2 text-xs text-slate-400 text-center py-6">Nenhum jogador cadastrado na base.</p>`; return; }
+      filtered.forEach(player => {
+        const item = document.createElement('div');
+        item.className = 'bg-slate-50 border border-slate-200 rounded-xl p-2.5 flex items-center justify-between gap-2';
+        item.innerHTML = `
+          <div class="flex items-center gap-2 overflow-hidden"><img src="${player.photo}" class="w-9 h-9 rounded-full object-cover border border-slate-300 flex-shrink-0" onerror="this.src='${DEFAULT_AVATAR}'"><div class="truncate"><p class="text-xs font-bold text-slate-800 truncate">${player.name}</p><p class="text-[10px] text-emerald-600 font-semibold">${player.pos} | #${player.number}</p></div></div>
+          <div class="flex gap-1 flex-shrink-0"><button onclick="importPlayerToField('${player.id}', 'A')" class="bg-red-50 hover:bg-red-100 text-red-700 text-[10px] px-2 py-1 rounded-md border border-red-200 font-semibold">+A</button><button onclick="importPlayerToField('${player.id}', 'B')" class="bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] px-2 py-1 rounded-md border border-blue-200 font-semibold">+B</button></div>`;
+        container.appendChild(item);
+      });
+    }
+
+    function importPlayerToField(libId, team) {
+      const libPlayer = globalPlayerLibrary.find(p => p.id === libId);
+      if (!libPlayer) return;
+      players.push({ id: `${team}_${Date.now()}`, team, name: libPlayer.name, number: libPlayer.number, pos: libPlayer.pos, status: 'bench', x: 0, y: 0, photo: libPlayer.photo });
+      saveStateToLocalStorage(); renderAll(); closeModal('library-modal');
+    }
+
+    /* BUSCA E AUTOPREENCHIMENTO NA BASE DE DADOS DENTRO DO EDITAR JOGADOR */
+    function searchInDatabase(query) {
+      const resultsContainer = document.getElementById('db-search-results');
+      if (!query.trim()) {
+        resultsContainer.innerHTML = '';
+        resultsContainer.classList.add('hidden');
+        return;
+      }
+
+      const matches = globalPlayerLibrary.filter(p => p.name.toLowerCase().includes(query.toLowerCase()));
+      
+      if (matches.length === 0) {
+        resultsContainer.innerHTML = `<div class="p-2 text-[11px] text-slate-400 text-center">Nenhum jogador encontrado</div>`;
+      } else {
+        resultsContainer.innerHTML = matches.map(p => `
+          <div onclick="applyDatabasePlayer('${p.id}')" class="p-2 hover:bg-indigo-50 rounded-lg cursor-pointer flex items-center justify-between transition border-b border-slate-100 last:border-b-0">
+            <div class="flex items-center gap-2">
+              <img src="${p.photo}" class="w-6 h-6 rounded-full object-cover" onerror="this.src='${DEFAULT_AVATAR}'">
+              <span class="text-xs font-semibold text-slate-800">${p.name}</span>
+            </div>
+            <span class="text-[10px] font-bold text-indigo-600">${p.pos} - #${p.number}</span>
+          </div>
+        `).join('');
+      }
+      resultsContainer.classList.remove('hidden');
+    }
+
+    function applyDatabasePlayer(libId) {
+      const target = globalPlayerLibrary.find(p => p.id === libId);
+      if (!target) return;
+
+      document.getElementById('edit-player-name').value = target.name;
+      document.getElementById('edit-player-pos').value = target.pos;
+      document.getElementById('edit-player-number').value = target.number;
+      document.getElementById('edit-preview-img').src = target.photo;
+      
+      document.getElementById('edit-search-db').value = '';
+      document.getElementById('db-search-results').classList.add('hidden');
+      
+      showToast(`Dados de ${target.name} carregados!`, "info");
+    }
+
+    function openBackupModal() { document.getElementById('backup-modal').classList.remove('hidden'); }
+    function exportJSONBackup() {
+      const data = { matchState: localStorage.getItem('tactical_board_match_state'), clubs: savedClubs, library: globalPlayerLibrary };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'backup.json'; link.click();
+    }
+    function importJSONBackup(input) {
+      if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          try {
+            const data = JSON.parse(e.target.result);
+            if (data.clubs) savedClubs = data.clubs;
+            if (data.library) globalPlayerLibrary = data.library;
+            if (data.matchState) localStorage.setItem('tactical_board_match_state', data.matchState);
+            saveStateToLocalStorage(); loadLocalStorageData(); renderAll(); closeModal('backup-modal');
+            showToast("Backup importado!", "success");
+          } catch(err) { showToast("Erro no JSON", "error"); }
+        };
+        reader.readAsText(input.files[0]);
+      }
+    }
+
+    function openEditModal(id) {
+      const p = players.find(x => x.id === id);
+      if (!p) return;
+      document.getElementById('edit-player-id').value = p.id;
+      document.getElementById('edit-player-name').value = p.name;
+      document.getElementById('edit-player-pos').value = p.pos;
+      document.getElementById('edit-player-number').value = p.number;
+      document.getElementById('edit-preview-img').src = p.photo;
+      
+      // Limpa busca anterior na base
+      document.getElementById('edit-search-db').value = '';
+      document.getElementById('db-search-results').classList.add('hidden');
+      
+      document.getElementById('edit-modal').classList.remove('hidden');
+    }
+
+    function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+    function previewUrlImage(url) { if (url.trim()) document.getElementById('edit-preview-img').src = url; }
+    function previewFileImage(input) {
+      if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = (e) => { document.getElementById('edit-preview-img').src = e.target.result; };
+        reader.readAsDataURL(input.files[0]);
+      }
+    }
+    function savePlayer(e) {
+      e.preventDefault();
+      const id = document.getElementById('edit-player-id').value;
+      const p = players.find(x => x.id === id);
+      if (p) {
+        p.name = document.getElementById('edit-player-name').value;
+        p.pos = document.getElementById('edit-player-pos').value;
+        p.number = parseInt(document.getElementById('edit-player-number').value) || p.number;
+        p.photo = document.getElementById('edit-preview-img').src;
+        saveStateToLocalStorage(); renderAll(); closeModal('edit-modal');
+      }
+    }
+
+    function resetPositions() { if (confirm("Deseja resetar as posições e o campo?")) { initDefaultMatch(); renderAll(); } }
+
+    function switchTab(team, tab) {
+      const bench = document.getElementById(`bench${team}-container`);
+      const injured = document.getElementById(`injured${team}-container`);
+      const btnBench = document.getElementById(`tab${team}-bench`);
+      const btnInjured = document.getElementById(`tab${team}-injured`);
+      const activeColor = team === 'A' ? 'border-red-500 text-red-600' : 'border-blue-500 text-blue-600';
+      if (tab === 'bench') {
+        bench.classList.remove('hidden'); injured.classList.add('hidden');
+        btnBench.className = `flex-1 py-1 text-xs font-semibold border-b-2 ${activeColor}`;
+        btnInjured.className = `flex-1 py-1 text-xs font-semibold text-slate-400`;
+      } else {
+        bench.classList.add('hidden'); injured.classList.remove('hidden');
+        btnInjured.className = `flex-1 py-1 text-xs font-semibold border-b-2 ${activeColor}`;
+        btnBench.className = `flex-1 py-1 text-xs font-semibold text-slate-400`;
+      }
+    }
+
+    function showToast(message, type = "info") {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      const bgColors = { success: 'bg-emerald-600 text-white', error: 'bg-red-600 text-white', info: 'bg-slate-800 text-white' };
+      toast.className = `px-3 py-2 rounded-xl text-xs font-medium shadow-lg transition-all duration-300 transform translate-y-2 opacity-0 flex items-center gap-2 ${bgColors[type] || bgColors.info}`;
+      toast.innerText = message;
+      container.appendChild(toast);
+      setTimeout(() => toast.classList.remove('translate-y-2', 'opacity-0'), 10);
+      setTimeout(() => { toast.classList.add('opacity-0', 'translate-y-2'); setTimeout(() => toast.remove(), 300); }, 3000);
+    }
+
+    function exportTactics() {
+      html2canvas(document.getElementById('tactical-pitch'), { scale: 2, useCORS: true, backgroundColor: null }).then(canvas => {
+        const link = document.createElement('a'); link.download = 'escalacao.png'; link.href = canvas.toDataURL('image/png'); link.click();
+      });
+    }
+
+    window.onload = () => {
+      initApp();
+      if (window.lucide) {
+        lucide.createIcons();
+      }
+    };
+  </script>
+</body>
+</html>
